@@ -7,9 +7,9 @@ from google.colab import files
 uploaded = files.upload()
 ds = pd.read_csv("spam (1).csv", encoding='latin-1')
 ds.head(10)
-
+# Work flow : 
 # 1. Data cleaning
-# 2. EDA
+# 2. Exploratory Data Analysis (EDA)
 # 3. Text Preprocessing
 # 4. Model Building
 # 5. Evaluation
@@ -37,11 +37,10 @@ ds.isnull().sum() # check missing value
 
 ds.duplicated().sum() # check duplicated value
 
-
-
 ds = ds.drop_duplicates(keep='first') # remove dupicates without first duplicated value
 print(ds.duplicated().sum())
 print(ds.shape)
+
 
 """# ***2. EDA***"""
 
@@ -84,13 +83,9 @@ sns.pairplot(ds,hue='target')
 sns.heatmap(ds[['target', 'num_characters', 'num_words', 'num_sentances']].corr(), annot=True) # Correlation visualization
 
 """3. Data Preprocessing
-
       -> Lower Case
-
       -> Tokenization
-
-      -> Removing Special Characters
-      
+      -> Removing Special Characters      
       -> Stemming
 """
 
@@ -138,15 +133,16 @@ transform_test(' H did you like dancing m presentation on ML and Dl ## % 6 ^ ')
 ds['transformed_text'] = ds['text'].apply(transform_test)
 ds.head()
 
-from wordcloud import WordCloud # frequent work show bigger size
+# frequent work show bigger size
+from wordcloud import WordCloud 
 wc = WordCloud(width=500, height=500, min_font_size=10,
                background_color='white')
-
 spam_wc = wc.generate(ds[ds['target']==1]['transformed_text'].str.cat(sep=" "))
-
 plt.imshow(spam_wc)
 
-spam_corpus=[] # store all word from spam transformed_text
+
+ # store all word from spam transformed_text
+spam_corpus = []
 for msg in ds[ds['target']==1]['transformed_text'].tolist():
   for word in msg.split():
     spam_corpus.append(word)
@@ -224,7 +220,7 @@ print(accuracy_score(y_test,y_pred3))
 print(confusion_matrix(y_test,y_pred3))
 print(precision_score(y_test,y_pred3))
 
-# tfidf -> mnb
+# Hiper-parameter tunine
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -265,6 +261,7 @@ clfs ={
     'xgb': xgb
 }
 
+# accuracy, precison
 def train_classifier(clf,x_train,y_train,x_test,y_test):
   clf.fit(x_train,y_train)
   y_pred = clf.predict(x_test)
@@ -275,6 +272,7 @@ def train_classifier(clf,x_train,y_train,x_test,y_test):
 
 train_classifier(svc,x_train,y_train,x_test,y_test)
 
+# every time take a model and store it's accuracy and precision
 accuracy_scores = []
 precision_scores = []
 
@@ -288,6 +286,7 @@ for name,clf in clfs.items():
   accuracy_scores.append(current_accuracy)
   precision_scores.append(current_precision)
 
+# sorting descending order precison
 performance_df = pd.DataFrame({'Algorithm':clfs.keys(),
 'Accuracy':accuracy_scores,'Precision':precision_scores}).sort_values('Precision',
 ascending=False)
@@ -296,12 +295,15 @@ performance_df
 performance_df1 = pd.melt(performance_df,id_vars='Algorithm')
 performance_df1
 
+# show graph
 performance_df_melted = performance_df.melt(id_vars='Algorithm', var_name='Metric', value_vars=['Accuracy', 'Precision'], value_name='Value')
 sns.catplot(x='Algorithm', y='Value', hue='Metric', data=performance_df_melted, kind='bar', height=5)
 plt.xticks(rotation='vertical')
 plt.ylim(.5, 1.0)
 plt.show()
 
+# model improve
+# 1. change the max_features parameter of Tfidf
 temp_df = pd.DataFrame({'Algorithm':clfs.keys(),'Accuracy_max_ft_3000':accuracy_scores,'Precision_max_ft_3000':precision_scores}).sort_values('Precision_max_ft_3000',ascending=False)
 temp_df = pd.DataFrame({'Algorithm':clfs.keys(),'Accuracy_scaling':accuracy_scores,'Precision_scaling':precision_scores}).sort_values('Precision_scaling',ascending=False)
 
@@ -315,57 +317,36 @@ new_df_scaled.merge(temp_df,on='Algorithm')
 
 performance_df.merge(temp_df,on='Algorithm')
 
+
 # Voting Classifier
 svc = SVC(kernel='sigmoid', gamma=1.0,probability=True)
 mnb = MultinomialNB()
 etc = ExtraTreesClassifier(n_estimators=50, random_state=2)
 
 from sklearn.ensemble import VotingClassifier
-
 voting = VotingClassifier(estimators=[('svm', svc), ('nb', mnb), ('et', etc)],voting='soft')
-
 voting.fit(x_train,y_train)
-
-VotingClassifier(estimators=[('svm',
-                              SVC(gamma=1.0, kernel='sigmoid',
-                                  probability=True)),
-                             ('nb', MultinomialNB()),
-                             ('et',
-                              ExtraTreesClassifier(n_estimators=50,
-                                                   random_state=2))],
-                 voting='soft')
+VotingClassifier(estimators=[('svm',SVC(gamma=1.0, kernel='sigmoid',
+                             probability=True)),('nb', MultinomialNB()),
+                             ('et',ExtraTreesClassifier(n_estimators=50,
+                             random_state=2))],voting='soft')
 
 y_pred = voting.predict(x_test)
 print("Accuracy",accuracy_score(y_test,y_pred))
 print("Precision",precision_score(y_test,y_pred))
 
-# Applying stacking
+# Applying stacking -> weatage
 estimators=[('svm', svc), ('nb', mnb), ('et', etc)]
 final_estimator=RandomForestClassifier()
 
 from sklearn.ensemble import StackingClassifier
-
 clf = StackingClassifier(estimators=estimators, final_estimator=final_estimator)
-
 clf.fit(x_train,y_train)
 y_pred = clf.predict(x_test)
 print("Accuracy",accuracy_score(y_test,y_pred))
 print("Precision",precision_score(y_test,y_pred))
 
 
-
-import pickle
-pickle.dump(Tfidf,open('vectorizer.pkl','wb'))
-from google.colab import files
-files.download('vectorizer.pkl')
-
-pickle.dump(mnb,open('model.pkl','wb'))
-from google.colab import files
-files.download('model.pkl')
-
-# pickle.dump(mnb,open('model.pkl','wb'))
-# from google.colab import files
-# files.download('model.pkl')
 
 
 
